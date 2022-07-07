@@ -184,7 +184,7 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
             nodes.push(left.clone());
         }
     }
-
+    #[cfg(feature = "verbose")]
     for i in 0..256 {
         if freqs[i] > 0 {
             let leaf = RefCell::borrow(&leafs[i]);
@@ -212,23 +212,5 @@ mod tests {
         freqs[40] = 20;
 
         create_tree(&freqs);
-    }
-
-    #[test]
-    fn encode() {
-        let path = "faust.in";
-        let path = Path::new(&path);
-        let contents = std::fs::read(path).unwrap();
-        let encoded = Huffman::encode(&contents);
-        std::fs::write(Path::new("encoded"), encoded).unwrap();
-    }
-
-    #[test]
-    fn decode() {
-        let path = "encoded";
-        let path = Path::new(&path);
-        let contents = std::fs::read(path).unwrap();
-        let encoded = Huffman::decode(&contents);
-        std::fs::write(Path::new("decoded"), encoded).unwrap();
     }
 }

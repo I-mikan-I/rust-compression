@@ -15,10 +15,11 @@ impl Bwt {
 }
 
 impl Coder<u8, u8> for Bwt {
-    fn encode(input: &[u8]) -> Vec<u8> {
+    fn encode(input: impl AsRef<[u8]>) -> Vec<u8> {
         Bwt::new(20).encode_s(input)
     }
-    fn decode(input: &[u8]) -> Vec<u8> {
+    fn decode(input: impl AsRef<[u8]>) -> Vec<u8> {
+        let input = input.as_ref();
         let mut output = Vec::with_capacity(input.len());
         let block_len: u32 = u32::from_le_bytes(
             (&input[0..4])
@@ -50,7 +51,8 @@ impl Coder<u8, u8> for Bwt {
         }
         output
     }
-    fn encode_s(&self, input: &[u8]) -> Vec<u8> {
+    fn encode_s(&self, input: impl AsRef<[u8]>) -> Vec<u8> {
+        let input = input.as_ref();
         let mut output = Vec::new();
         let block_size: u32 = 1 << self.block_pow;
         let table: Vec<u32> = (0..block_size).into_iter().collect();

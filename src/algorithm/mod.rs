@@ -5,12 +5,12 @@ pub use bwt::*;
 pub use huffman::*;
 pub use movetofront::*;
 pub trait Coder<I: Copy, O: Copy> {
-    fn encode(input: &[I]) -> Vec<O>;
-    fn decode(input: &[O]) -> Vec<I>;
-    fn encode_s(&self, input: &[I]) -> Vec<O> {
+    fn encode(input: impl AsRef<[I]>) -> Vec<O>;
+    fn decode(input: impl AsRef<[O]>) -> Vec<I>;
+    fn encode_s(&self, input: impl AsRef<[I]>) -> Vec<O> {
         Self::encode(input)
     }
-    fn decode_s(&self, input: &[O]) -> Vec<I> {
+    fn decode_s(&self, input: impl AsRef<[O]>) -> Vec<I> {
         Self::decode(input)
     }
 }

@@ -5,7 +5,8 @@ use std::rc::Rc;
 pub struct Huffman {}
 
 impl Coder<u8, u8> for Huffman {
-    fn encode(input: &[u8]) -> Vec<u8> {
+    fn encode(input: impl AsRef<[u8]>) -> Vec<u8> {
+        let input = input.as_ref();
         let mut output = Vec::new();
         let mut freqs = [0u32; 256];
         input.iter().fold(&mut freqs, |acc, &byte| {
@@ -46,7 +47,8 @@ impl Coder<u8, u8> for Huffman {
         output
     }
 
-    fn decode(input: &[u8]) -> Vec<u8> {
+    fn decode(input: impl AsRef<[u8]>) -> Vec<u8> {
+        let input = input.as_ref();
         let mut output = Vec::new();
         let mut count = 0;
         let freqs = input
@@ -66,7 +68,6 @@ impl Coder<u8, u8> for Huffman {
             })
             .flatten()
             .collect::<Vec<_>>();
-        println!("{:?}", freqs.len());
         let input = &input[std::mem::size_of::<u32>() * 256..];
         let freqs: [u32; 256] = freqs.try_into().unwrap();
         let (_, root) = create_tree(&freqs);

@@ -13,9 +13,10 @@ const fn get_list() -> [u8; 256] {
 }
 
 impl Coder<u8, u8> for MoveToFront {
-    fn encode(input: &[u8]) -> Vec<u8> {
+    fn encode(input: impl AsRef<[u8]>) -> Vec<u8> {
         let list = get_list();
         input
+            .as_ref()
             .iter()
             .scan(list, |state, &b| {
                 let index = state
@@ -32,9 +33,10 @@ impl Coder<u8, u8> for MoveToFront {
             .collect()
     }
 
-    fn decode(input: &[u8]) -> Vec<u8> {
+    fn decode(input: impl AsRef<[u8]>) -> Vec<u8> {
         let list = get_list();
         input
+            .as_ref()
             .iter()
             .scan(list, |state, &index| {
                 let byte = state[index as usize];

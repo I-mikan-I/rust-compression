@@ -40,13 +40,10 @@ impl Coder<u8, u8> for Bwt {
             index += block_len + 4;
             first_column.sort_by_key(|(_, b)| *b);
             let mut i = row as usize;
-            loop {
+            for _ in 0..first_column.len() {
                 let (next, val) = first_column[i];
                 output.push(val);
                 i = next;
-                if i == row as usize {
-                    break;
-                }
             }
         }
         output
@@ -101,6 +98,13 @@ mod tests {
         let input = [3_u8, 8, 8, 3, 2, 1];
         let output = Bwt::decode(&Bwt::encode(&input));
         assert_eq!(Vec::from(input), output)
+    }
+
+    #[test]
+    fn transform_2() {
+        let input = &[46_u8, 46];
+        let output = Bwt::decode(Bwt::encode(input));
+        assert_eq!(Vec::from(&input[..]), output)
     }
 
     #[test]

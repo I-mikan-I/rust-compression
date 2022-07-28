@@ -6,7 +6,7 @@ pub struct Bwt {
 }
 
 impl Bwt {
-    pub fn new(block_pow: usize) -> Self {
+    pub const fn new(block_pow: usize) -> Self {
         if block_pow > 32 {
             panic!("Only up to 4GiB large blocks supported!")
         }

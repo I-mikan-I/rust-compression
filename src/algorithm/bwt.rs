@@ -4,6 +4,7 @@ use std::error::Error;
 
 const DECODE_ERROR: &str = "input file is not properly encoded";
 
+#[derive(Clone, Debug)]
 pub struct Bwt {
     block_pow: usize,
 }
@@ -118,11 +119,13 @@ mod tests {
         let output = b.decode_s(&b.encode_s(&input).unwrap()).unwrap();
         assert_eq!(input, output)
     }
+
     #[test]
     fn decode_unencoded_1() {
-        let input = [0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0xa];
+        let input = [0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa];
         let _ = Bwt::decode(input);
     }
+
     #[test]
     fn empty() {
         let _ = Bwt::decode(Bwt::encode([]).unwrap()).unwrap();

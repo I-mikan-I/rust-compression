@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 const DECODE_ERROR: &str = "input file is not properly encoded";
 
+#[derive(Clone, Debug)]
 pub struct Huffman {}
 
 impl Coder<u8, u8> for Huffman {

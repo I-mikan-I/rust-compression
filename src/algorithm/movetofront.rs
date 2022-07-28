@@ -1,6 +1,7 @@
 use crate::Coder;
 use std::error::Error;
 
+#[derive(Clone, Debug)]
 pub struct MoveToFront {}
 
 const fn get_list() -> [u8; 256] {

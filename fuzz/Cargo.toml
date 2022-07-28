@@ -8,6 +8,7 @@ edition = "2018"
 [profile.release]
 lto = true
 codegen-units = 4
+overflow-checks = true
 
 [package.metadata]
 cargo-fuzz = true
@@ -37,5 +38,17 @@ doc = false
 [[bin]]
 name = "movetofront"
 path = "fuzz_targets/movetofront.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "decode_bwt"
+path = "fuzz_targets/decode_bwt.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "decode_huffman"
+path = "fuzz_targets/decode_huffman.rs"
 test = false
 doc = false

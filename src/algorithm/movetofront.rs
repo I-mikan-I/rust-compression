@@ -1,4 +1,5 @@
 use crate::Coder;
+use std::error::Error;
 
 pub struct MoveToFront {}
 
@@ -13,9 +14,10 @@ const fn get_list() -> [u8; 256] {
 }
 
 impl Coder<u8, u8> for MoveToFront {
-    fn encode(input: impl AsRef<[u8]>) -> Vec<u8> {
+    type Error = Box<dyn Error + Send + Sync + 'static>;
+    fn encode(input: impl AsRef<[u8]>) -> Result<Vec<u8>, Self::Error> {
         let list = get_list();
-        input
+        Ok(input
             .as_ref()
             .iter()
             .scan(list, |state, &b| {
@@ -30,12 +32,12 @@ impl Coder<u8, u8> for MoveToFront {
                 }
                 Some(index as u8)
             })
-            .collect()
+            .collect())
     }
 
-    fn decode(input: impl AsRef<[u8]>) -> Vec<u8> {
+    fn decode(input: impl AsRef<[u8]>) -> Result<Vec<u8>, Self::Error> {
         let list = get_list();
-        input
+        Ok(input
             .as_ref()
             .iter()
             .scan(list, |state, &index| {
@@ -45,7 +47,7 @@ impl Coder<u8, u8> for MoveToFront {
                 }
                 Some(byte)
             })
-            .collect()
+            .collect())
     }
 }
 
@@ -59,7 +61,7 @@ mod tests {
         let input = b"Hello, World!!!!!";
         let encoded = MoveToFront::encode(input);
         println!("{:?}", encoded);
-        let output = MoveToFront::decode(&encoded);
+        let output = MoveToFront::decode(&encoded.unwrap()).unwrap();
         assert_eq!(input, &output[..]);
     }
 }

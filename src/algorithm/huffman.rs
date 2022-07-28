@@ -1,16 +1,21 @@
 use crate::algorithm::Coder;
+use std::boxed::Box;
 use std::cell::RefCell;
+use std::error::Error;
 use std::rc::Rc;
+
+const DECODE_ERROR: &str = "input file is not properly encoded";
 
 pub struct Huffman {}
 
 impl Coder<u8, u8> for Huffman {
-    fn encode(input: impl AsRef<[u8]>) -> Vec<u8> {
+    type Error = Box<dyn Error + Send + Sync + 'static>;
+    fn encode(input: impl AsRef<[u8]>) -> Result<Vec<u8>, Self::Error> {
         let input = input.as_ref();
         let mut output = Vec::new();
         let mut freqs = [0u32; 256];
         input.iter().fold(&mut freqs, |acc, &byte| {
-            (*acc)[byte as usize] += 1;
+            (*acc)[byte as usize] = (*acc)[byte as usize].saturating_add(1);
             acc
         });
         freqs
@@ -44,13 +49,16 @@ impl Coder<u8, u8> for Huffman {
             next <<= 8 - filled;
             output.push(next);
         }
-        output
+        Ok(output)
     }
 
-    fn decode(input: impl AsRef<[u8]>) -> Vec<u8> {
+    fn decode(input: impl AsRef<[u8]>) -> Result<Vec<u8>, Self::Error> {
         let input = input.as_ref();
+        if input.len() < std::mem::size_of::<u32>() * 256 {
+            return Err(DECODE_ERROR.into());
+        }
         let mut output = Vec::new();
-        let mut count = 0;
+        let mut count: u64 = 0;
         let freqs = input
             .iter()
             .take(std::mem::size_of::<u32>() * 256)
@@ -60,7 +68,7 @@ impl Coder<u8, u8> for Huffman {
                 if s.1 == 4 {
                     s.1 = 0;
                     let num = u32::from_le_bytes(s.0);
-                    count += num;
+                    count += num as u64;
                     Some(Some(num))
                 } else {
                     Some(None)
@@ -69,7 +77,9 @@ impl Coder<u8, u8> for Huffman {
             .flatten()
             .collect::<Vec<_>>();
         let input = &input[std::mem::size_of::<u32>() * 256..];
-        let freqs: [u32; 256] = freqs.try_into().unwrap();
+        let freqs: [u32; 256] = freqs
+            .try_into()
+            .map_err(|_| Self::Error::from(DECODE_ERROR))?;
         let (_, root) = create_tree(&freqs);
 
         let mut current = root.clone();
@@ -77,10 +87,16 @@ impl Coder<u8, u8> for Huffman {
             let mut v = v;
             for _ in 0..8 {
                 if v & 0x80 == 0 {
-                    let left = RefCell::borrow(&current).left.clone().unwrap();
+                    let left = RefCell::borrow(&current)
+                        .left
+                        .clone()
+                        .ok_or_else(|| Self::Error::from(DECODE_ERROR))?;
                     current = left;
                 } else {
-                    let right = RefCell::borrow(&current).right.clone().unwrap();
+                    let right = RefCell::borrow(&current)
+                        .right
+                        .clone()
+                        .ok_or_else(|| Self::Error::from(DECODE_ERROR))?;
                     current = right;
                 }
                 v <<= 1;
@@ -89,13 +105,13 @@ impl Coder<u8, u8> for Huffman {
                     output.push(RefCell::borrow(&current).input);
                     count -= 1;
                     if count == 0 {
-                        return output;
+                        return Ok(output);
                     }
                     current = root.clone();
                 }
             }
         }
-        output
+        Ok(output)
     }
 }
 
@@ -152,7 +168,9 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
         let parent = Node {
             leaf: false,
             input: 0,
-            freq: RefCell::borrow(&n1).freq + RefCell::borrow(&n2).freq,
+            freq: RefCell::borrow(&n1)
+                .freq
+                .saturating_add(RefCell::borrow(&n2).freq),
             mask: 0,
             len: 0,
             left: Some(n1.clone()),
@@ -202,9 +220,7 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
 }
 #[cfg(test)]
 mod tests {
-    use crate::algorithm::huffman::{create_tree, Huffman};
-    use crate::algorithm::Coder;
-    use std::path::Path;
+    use crate::algorithm::huffman::create_tree;
 
     #[test]
     fn create_codes() {

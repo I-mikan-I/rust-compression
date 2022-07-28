@@ -1,5 +1,7 @@
 # Compression
 
+[![.github/workflows/rust.yml](https://github.com/I-mikan-I/rust-compression/actions/workflows/rust.yml/badge.svg)](https://github.com/I-mikan-I/rust-compression/actions/workflows/rust.yml)
+
 Reference implementation for different compression algorithms in rust.
 
 ## Features

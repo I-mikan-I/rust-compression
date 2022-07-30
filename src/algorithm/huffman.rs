@@ -1,6 +1,8 @@
 use crate::algorithm::Coder;
 use std::boxed::Box;
 use std::cell::RefCell;
+use std::cmp::{Ordering, Reverse};
+use std::collections::BinaryHeap;
 use std::error::Error;
 use std::rc::Rc;
 
@@ -83,39 +85,49 @@ impl Coder<u8, u8> for Huffman {
             .map_err(|_| Self::Error::from(DECODE_ERROR))?;
         let (_, root) = create_tree(&freqs);
 
-        let mut current = root.clone();
+        let mut current: *const Node = root.as_ptr() as *const _;
         for &v in input {
             let mut v = v;
             for _ in 0..8 {
+                // unsafe dereference is okay, because root of Huffman tree lives
+                // for the entirety of the loop, so no Nodes can be dropped, since the strong
+                // count is at least one.
+                // There are no aliasing &mut references to any Node, there are only read
+                // accesses.
+                let current_ = unsafe { &*current };
                 if v & 0x80 == 0 {
-                    let left = RefCell::borrow(&current)
+                    let left = current_
                         .left
-                        .clone()
-                        .ok_or_else(|| Self::Error::from(DECODE_ERROR))?;
+                        .as_ref()
+                        .ok_or_else(|| Self::Error::from(DECODE_ERROR))?
+                        .as_ptr() as *const _;
                     current = left;
                 } else {
-                    let right = RefCell::borrow(&current)
+                    let right = current_
                         .right
-                        .clone()
-                        .ok_or_else(|| Self::Error::from(DECODE_ERROR))?;
+                        .as_ref()
+                        .ok_or_else(|| Self::Error::from(DECODE_ERROR))?
+                        .as_ptr() as *const _;
                     current = right;
                 }
                 v <<= 1;
 
-                if RefCell::borrow(&current).leaf {
-                    output.push(RefCell::borrow(&current).input);
+                let current_ = unsafe { &*current };
+                if current_.leaf {
+                    output.push(current_.input);
                     count -= 1;
                     if count == 0 {
                         return Ok(output);
                     }
-                    current = root.clone();
+                    current = root.as_ptr();
                 }
             }
         }
+        // check that tree outlives loop.
+        let _ = root;
         Ok(output)
     }
 }
-
 struct Node {
     leaf: bool,
     input: u8,
@@ -124,6 +136,26 @@ struct Node {
     len: usize,
     left: Option<Rc<RefCell<Node>>>,
     right: Option<Rc<RefCell<Node>>>,
+}
+
+impl Ord for Node {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.freq.cmp(&other.freq)
+    }
+}
+
+impl PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.freq.partial_cmp(&other.freq)
+    }
+}
+
+impl Eq for Node {}
+
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.freq.eq(&other.freq)
+    }
 }
 
 impl Node {
@@ -144,28 +176,19 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
     let mut leafs: Vec<Rc<RefCell<Node>>> = (0..256)
         .map(|_| Rc::new(RefCell::new(Node::new())))
         .collect::<Vec<_>>();
-    let mut nodes = Vec::new();
+    let mut nodes = BinaryHeap::new();
     for (i, n_) in leafs.iter_mut().enumerate() {
         let mut n = RefCell::borrow_mut(n_);
         n.leaf = true;
         n.input = i as u8;
         n.freq = freqs[i as usize];
-        nodes.push(n_.clone());
+        drop(n);
+        nodes.push(Reverse(n_.clone()));
     }
 
     while nodes.len() > 1 {
-        let extract_min = |nodes: &Vec<Rc<RefCell<Node>>>| {
-            nodes
-                .iter()
-                .enumerate()
-                .min_by(|n1, n2| RefCell::borrow(n1.1).freq.cmp(&RefCell::borrow(n2.1).freq))
-                .unwrap_or_else(|| panic!("Could not extract min"))
-                .0
-        };
-        let min = extract_min(&nodes);
-        let n1 = nodes.swap_remove(min);
-        let min = extract_min(&nodes);
-        let n2 = nodes.swap_remove(min);
+        let n1 = nodes.pop().unwrap().0;
+        let n2 = nodes.pop().unwrap().0;
         let parent = Node {
             leaf: false,
             input: 0,
@@ -177,13 +200,16 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
             left: Some(n1.clone()),
             right: Some(n2.clone()),
         };
-        nodes.push(Rc::new(RefCell::new(parent)))
+        nodes.push(Reverse(Rc::new(RefCell::new(parent))))
     }
 
-    let root = nodes[0].clone();
+    let root = nodes.pop().unwrap().0;
 
-    while !nodes.is_empty() {
-        let n = if let Some(x) = nodes.pop() {
+    let mut queue = Vec::with_capacity(256);
+    queue.push(root.clone());
+
+    while !queue.is_empty() {
+        let n = if let Some(x) = queue.pop() {
             x
         } else {
             panic!()
@@ -200,8 +226,8 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
                 right_r.mask = (n.mask << 1) + 1;
                 right_r.len = n.len + 1;
             }
-            nodes.push(right.clone());
-            nodes.push(left.clone());
+            queue.push(right.clone());
+            queue.push(left.clone());
         }
     }
     #[cfg(feature = "verbose")]
@@ -222,6 +248,8 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
 #[cfg(test)]
 mod tests {
     use crate::algorithm::huffman::create_tree;
+    use crate::Coder;
+    use crate::Huffman;
 
     #[test]
     fn create_codes() {
@@ -230,5 +258,12 @@ mod tests {
         freqs[40] = 20;
 
         create_tree(&freqs);
+    }
+
+    #[test]
+    fn roundtrip() {
+        let input = [1, 2, 3, 3, 3, 3, 4, 8, 19];
+        let output = Huffman::decode(Huffman::encode(input).unwrap()).unwrap();
+        assert_eq!(Vec::from(input), output);
     }
 }

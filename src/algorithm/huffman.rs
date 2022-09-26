@@ -26,11 +26,11 @@ impl Coder<u8, u8> for Huffman {
             .flat_map(|int| int.to_le_bytes())
             .for_each(|b| output.push(b));
 
-        let (leafs, _) = create_tree(&freqs);
+        let (leaves, _) = create_tree(&freqs);
         let mut next = 0u8;
         let mut filled = 0;
         for &v in input.iter() {
-            let leaf = RefCell::borrow(&leafs[v as usize]);
+            let leaf = RefCell::borrow(&leaves[v as usize]);
             let len = leaf.len;
             let mut code = leaf.mask << (32 - len);
 
@@ -173,11 +173,11 @@ impl Node {
 }
 
 fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node>>) {
-    let mut leafs: Vec<Rc<RefCell<Node>>> = (0..256)
+    let mut leaves: Vec<Rc<RefCell<Node>>> = (0..256)
         .map(|_| Rc::new(RefCell::new(Node::new())))
         .collect::<Vec<_>>();
     let mut nodes = BinaryHeap::new();
-    for (i, n_) in leafs.iter_mut().enumerate() {
+    for (i, n_) in leaves.iter_mut().enumerate() {
         let mut n = RefCell::borrow_mut(n_);
         n.leaf = true;
         n.input = i as u8;
@@ -208,12 +208,7 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
     let mut queue = Vec::with_capacity(256);
     queue.push(root.clone());
 
-    while !queue.is_empty() {
-        let n = if let Some(x) = queue.pop() {
-            x
-        } else {
-            panic!()
-        };
+    while let Some(n) = queue.pop() {
         let n = RefCell::borrow_mut(&n);
         if !n.leaf {
             let left = n.left.as_ref().unwrap_or_else(|| panic!());
@@ -233,7 +228,7 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
     #[cfg(feature = "verbose")]
     for i in 0..256 {
         if freqs[i] > 0 {
-            let leaf = RefCell::borrow(&leafs[i]);
+            let leaf = RefCell::borrow(&leaves[i]);
             println!(
                 "[{}] ({}x): {:0width$b}",
                 char::from(i as u8),
@@ -243,7 +238,7 @@ fn create_tree(freqs: &[u32; 256]) -> ([Rc<RefCell<Node>>; 256], Rc<RefCell<Node
             )
         }
     }
-    (leafs.try_into().unwrap_or_else(|_| panic!()), root)
+    (leaves.try_into().unwrap_or_else(|_| panic!()), root)
 }
 #[cfg(test)]
 mod tests {
@@ -258,6 +253,12 @@ mod tests {
         freqs[40] = 20;
 
         create_tree(&freqs);
+    }
+
+    #[test]
+    fn create_codes_2() {
+        let input = b"Fearless concurrency";
+        let _ = Huffman::encode(input).unwrap();
     }
 
     #[test]
